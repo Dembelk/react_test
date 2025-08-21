@@ -19,13 +19,43 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Initialize Telegram Bot
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+// Initialize Telegram Bot with error handling
+let bot = null;
+let botStatus = 'disconnected';
+
+try {
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN.length > 20) {
+    bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+    botStatus = 'connected';
+    console.log('🤖 Telegram Bot initialized successfully');
+  } else {
+    console.log('⚠️  Invalid Telegram Bot Token. Bot will run in demo mode.');
+    botStatus = 'demo';
+  }
+} catch (error) {
+  console.log('❌ Failed to initialize Telegram Bot:', error.message);
+  botStatus = 'error';
+}
 
 // Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai = null;
+let openaiStatus = 'disconnected';
+
+try {
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 20) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    openaiStatus = 'connected';
+    console.log('🧠 OpenAI initialized successfully');
+  } else {
+    console.log('⚠️  Invalid OpenAI API Key. AI features will be limited.');
+    openaiStatus = 'demo';
+  }
+} catch (error) {
+  console.log('❌ Failed to initialize OpenAI:', error.message);
+  openaiStatus = 'error';
+}
 
 // Global state
 let counterValue = 0;
@@ -44,6 +74,7 @@ io.on('connection', (socket) => {
   // Send current state to new client
   socket.emit('counterUpdate', counterValue);
   socket.emit('achievementsUpdate', achievements);
+  socket.emit('botStatusUpdate', { bot: botStatus, openai: openaiStatus });
   
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -75,6 +106,15 @@ app.get('/api/achievements', (req, res) => {
   res.json(achievements);
 });
 
+app.get('/api/status', (req, res) => {
+  res.json({ 
+    bot: botStatus, 
+    openai: openaiStatus,
+    counter: counterValue,
+    achievements: Object.values(achievements).filter(a => a.earned).length
+  });
+});
+
 // Achievement checking function
 function checkAchievements() {
   if (counterValue === 1 && !achievements.firstClick.earned) {
@@ -93,158 +133,214 @@ function checkAchievements() {
   }
 }
 
-// Telegram Bot Commands
-bot.onText(/\/start/, async (msg) => {
-  const chatId = msg.chat.id;
-  const welcomeMessage = `
-🚀 Добро пожаловать в MCP Project Bot!
+// Telegram Bot Commands (only if bot is connected)
+if (bot && botStatus === 'connected') {
+  bot.onText(/\/start/, async (msg) => {
+    const chatId = msg.chat.id;
+    const welcomeMessage = `
+🚀 *Добро пожаловать в MCP Project Bot!*
 
-Доступные команды:
+Я умный бот, который поможет вам управлять счетчиком и общаться с ИИ!
+
+*Что я умею:*
+• 📊 Управлять счетчиком (увеличивать/уменьшать)
+• 🤖 Общаться с ИИ через OpenAI
+• 🏆 Отслеживать ваши достижения
+• 🔄 Синхронизировать данные с веб-приложением
+
+*Доступные команды:*
 /counter - Показать текущее значение счетчика
 /increment - Увеличить счетчик
 /decrement - Уменьшить счетчик
 /chat - Начать чат с ИИ
 /achievements - Показать достижения
 /help - Показать эту справку
+/status - Статус сервисов
 
-Счетчик: ${counterValue}
-  `;
-  
-  bot.sendMessage(chatId, welcomeMessage);
-});
+*Текущий счетчик:* ${counterValue}
 
-bot.onText(/\/counter/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, `📊 Текущее значение счетчика: ${counterValue}`);
-});
-
-bot.onText(/\/increment/, (msg) => {
-  const chatId = msg.chat.id;
-  counterValue++;
-  checkAchievements();
-  io.emit('counterUpdate', counterValue);
-  io.emit('achievementsUpdate', achievements);
-  
-  // Unlock Telegram user achievement
-  if (!achievements.telegramUser.earned) {
-    achievements.telegramUser.earned = true;
-    io.emit('achievementsUpdate', achievements);
-  }
-  
-  bot.sendMessage(chatId, `➕ Счетчик увеличен! Новое значение: ${counterValue}`);
-});
-
-bot.onText(/\/decrement/, (msg) => {
-  const chatId = msg.chat.id;
-  counterValue--;
-  checkAchievements();
-  io.emit('counterUpdate', counterValue);
-  io.emit('achievementsUpdate', achievements);
-  
-  // Unlock Telegram user achievement
-  if (!achievements.telegramUser.earned) {
-    achievements.telegramUser.earned = true;
-    io.emit('achievementsUpdate', achievements);
-  }
-  
-  bot.sendMessage(chatId, `➖ Счетчик уменьшен! Новое значение: ${counterValue}`);
-});
-
-bot.onText(/\/achievements/, (msg) => {
-  const chatId = msg.chat.id;
-  let achievementsText = '🏆 Ваши достижения:\n\n';
-  
-  Object.entries(achievements).forEach(([key, achievement]) => {
-    const status = achievement.earned ? '✅' : '❌';
-    achievementsText += `${status} ${achievement.name}: ${achievement.description}\n`;
+💡 *Совет:* Попробуйте команду /chat для общения с ИИ!
+    `;
+    
+    bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
   });
-  
-  bot.sendMessage(chatId, achievementsText);
-});
 
-bot.onText(/\/help/, (msg) => {
-  const chatId = msg.chat.id;
-  const helpMessage = `
-🤖 Справка по командам:
+  bot.onText(/\/counter/, (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, `📊 Текущее значение счетчика: *${counterValue}*`, { parse_mode: 'Markdown' });
+  });
 
-/counter - Показать текущее значение счетчика
-/increment - Увеличить счетчик
-/decrement - Уменьшить счетчик
-/chat - Начать чат с ИИ
-/achievements - Показать достижения
-/help - Показать эту справку
-
-💡 Совет: Используйте /chat для общения с ИИ!
-  `;
-  
-  bot.sendMessage(chatId, helpMessage);
-});
-
-// AI Chat functionality
-bot.onText(/\/chat/, async (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, '🤖 Привет! Я ИИ ассистент. Напишите мне что-нибудь, и я отвечу!');
-});
-
-// Handle AI chat messages
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
-  
-  // Skip bot commands
-  if (text.startsWith('/')) return;
-  
-  // Skip if it's not a chat message (like /chat command)
-  if (text === '🤖 Привет! Я ИИ ассистент. Напишите мне что-нибудь, и я отвечу!') return;
-  
-  try {
-    // Unlock AI chatter achievement
-    if (!achievements.aiChatter.earned) {
-      achievements.aiChatter.earned = true;
+  bot.onText(/\/increment/, (msg) => {
+    const chatId = msg.chat.id;
+    counterValue++;
+    checkAchievements();
+    io.emit('counterUpdate', counterValue);
+    io.emit('achievementsUpdate', achievements);
+    
+    // Unlock Telegram user achievement
+    if (!achievements.telegramUser.earned) {
+      achievements.telegramUser.earned = true;
       io.emit('achievementsUpdate', achievements);
     }
     
-    bot.sendMessage(chatId, '🤔 Думаю...');
+    bot.sendMessage(chatId, `➕ Счетчик увеличен! Новое значение: *${counterValue}*`, { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/\/decrement/, (msg) => {
+    const chatId = msg.chat.id;
+    counterValue--;
+    checkAchievements();
+    io.emit('counterUpdate', counterValue);
+    io.emit('achievementsUpdate', achievements);
     
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "Ты дружелюбный ИИ ассистент. Отвечай кратко и по-русски. Ты помогаешь пользователю с проектом MCP."
-        },
-        {
-          role: "user",
-          content: text
-        }
-      ],
-      max_tokens: 150
+    // Unlock Telegram user achievement
+    if (!achievements.telegramUser.earned) {
+      achievements.telegramUser.earned = true;
+      io.emit('achievementsUpdate', achievements);
+    }
+    
+    bot.sendMessage(chatId, `➖ Счетчик уменьшен! Новое значение: *${counterValue}*`, { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/\/achievements/, (msg) => {
+    const chatId = msg.chat.id;
+    let achievementsText = '🏆 *Ваши достижения:*\n\n';
+    
+    Object.entries(achievements).forEach(([key, achievement]) => {
+      const status = achievement.earned ? '✅' : '❌';
+      achievementsText += `${status} *${achievement.name}*: ${achievement.description}\n`;
     });
     
-    const aiResponse = completion.choices[0].message.content;
-    bot.sendMessage(chatId, aiResponse);
+    const earnedCount = Object.values(achievements).filter(a => a.earned).length;
+    achievementsText += `\n*Прогресс:* ${earnedCount}/${Object.keys(achievements).length} достижений`;
     
-  } catch (error) {
-    console.error('OpenAI API Error:', error);
-    bot.sendMessage(chatId, '😔 Извините, произошла ошибка при обработке вашего сообщения.');
-  }
-});
+    bot.sendMessage(chatId, achievementsText, { parse_mode: 'Markdown' });
+  });
 
-// Error handling
-bot.on('error', (error) => {
-  console.error('Telegram Bot Error:', error);
-});
+  bot.onText(/\/help/, (msg) => {
+    const chatId = msg.chat.id;
+    const helpMessage = `
+🤖 *Справка по командам:*
 
-bot.on('polling_error', (error) => {
-  console.error('Telegram Bot Polling Error:', error);
-});
+/counter - Показать текущее значение счетчика
+/increment - Увеличить счетчик
+/decrement - Уменьшить счетчик
+/chat - Начать чат с ИИ
+/achievements - Показать достижения
+/status - Статус сервисов
+/help - Показать эту справку
+
+💡 *Совет:* Используйте /chat для общения с ИИ!
+
+🌐 *Веб-приложение:* http://localhost:3000
+    `;
+    
+    bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/\/status/, (msg) => {
+    const chatId = msg.chat.id;
+    const statusMessage = `
+📊 *Статус сервисов:*
+
+🤖 Telegram Bot: ${botStatus === 'connected' ? '✅ Подключен' : '❌ Ошибка'}
+🧠 OpenAI: ${openaiStatus === 'connected' ? '✅ Подключен' : '❌ Ошибка'}
+📈 Счетчик: ${counterValue}
+🏆 Достижения: ${Object.values(achievements).filter(a => a.earned).length}/${Object.keys(achievements).length}
+
+🌐 Веб-приложение: http://localhost:3000
+    `;
+    
+    bot.sendMessage(chatId, statusMessage, { parse_mode: 'Markdown' });
+  });
+
+  // AI Chat functionality
+  bot.onText(/\/chat/, async (msg) => {
+    const chatId = msg.chat.id;
+    if (openaiStatus === 'connected') {
+      bot.sendMessage(chatId, '🤖 Привет! Я ИИ ассистент. Напишите мне что-нибудь, и я отвечу!');
+    } else {
+      bot.sendMessage(chatId, '❌ ИИ сервис недоступен. Проверьте настройки OpenAI API.');
+    }
+  });
+
+  // Handle AI chat messages
+  bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+    
+    // Skip bot commands
+    if (text.startsWith('/')) return;
+    
+    // Skip if it's not a chat message (like /chat command)
+    if (text === '🤖 Привет! Я ИИ ассистент. Напишите мне что-нибудь, и я отвечу!') return;
+    
+    if (openaiStatus !== 'connected') {
+      bot.sendMessage(chatId, '❌ ИИ сервис недоступен. Проверьте настройки OpenAI API.');
+      return;
+    }
+    
+    try {
+      // Unlock AI chatter achievement
+      if (!achievements.aiChatter.earned) {
+        achievements.aiChatter.earned = true;
+        io.emit('achievementsUpdate', achievements);
+      }
+      
+      bot.sendMessage(chatId, '🤔 Думаю...');
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "Ты дружелюбный ИИ ассистент. Отвечай кратко и по-русски. Ты помогаешь пользователю с проектом MCP."
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        max_tokens: 150
+      });
+      
+      const aiResponse = completion.choices[0].message.content;
+      bot.sendMessage(chatId, aiResponse);
+      
+    } catch (error) {
+      console.error('OpenAI API Error:', error);
+      bot.sendMessage(chatId, '😔 Извините, произошла ошибка при обработке вашего сообщения.');
+    }
+  });
+
+  // Error handling
+  bot.on('error', (error) => {
+    console.error('Telegram Bot Error:', error);
+    botStatus = 'error';
+    io.emit('botStatusUpdate', { bot: botStatus, openai: openaiStatus });
+  });
+
+  bot.on('polling_error', (error) => {
+    console.error('Telegram Bot Polling Error:', error);
+    botStatus = 'error';
+    io.emit('botStatusUpdate', { bot: botStatus, openai: openaiStatus });
+  });
+} else {
+  console.log('🤖 Telegram Bot is not available. Running in demo mode.');
+}
 
 // Start server
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🤖 Telegram Bot started`);
+  console.log(`🤖 Telegram Bot status: ${botStatus}`);
+  console.log(`🧠 OpenAI status: ${openaiStatus}`);
   console.log(`🔌 WebSocket server ready`);
   console.log(`🌐 Frontend: http://localhost:3000`);
   console.log(`🔧 Backend API: http://localhost:${PORT}`);
+  
+  if (botStatus !== 'connected') {
+    console.log(`⚠️  To enable Telegram Bot, get a valid token from @BotFather`);
+    console.log(`⚠️  To enable OpenAI, add a valid API key to .env file`);
+  }
 });
