@@ -1,0 +1,94 @@
+# Universal Development Rules
+
+## Communication Style
+- Be concise and direct in responses
+- Provide working code, not pseudocode
+- Include necessary imports and dependencies
+- Explain complex logic with inline comments
+- Suggest improvements and alternatives when relevant
+
+## Code Quality
+- Write clean, readable, and maintainable code
+- Follow established conventions for the language
+- Use meaningful names for variables and functions
+- Keep functions small and focused on one task
+- Implement proper error handling
+
+## Security Practices
+- Never hardcode secrets or API keys
+- Validate and sanitize user input
+- Use parameterized queries for database access
+- Implement proper authentication and authorization
+- Follow principle of least privilege
+
+## Documentation
+- Write clear and concise comments
+- Document public APIs and complex algorithms
+- Include usage examples for complex functions
+- Keep documentation up-to-date with code changes
+- Use consistent formatting and style
+
+## Version Control
+- Write meaningful commit messages
+- Use conventional commit format
+- Keep commits small and focused
+- Include tests with feature implementations
+- Update documentation with changes
+
+## Performance Considerations
+- Profile before optimizing
+- Consider memory usage and efficiency
+- Use appropriate data structures and algorithms
+- Implement caching where beneficial
+- Monitor and measure performance impacts
+
+# React + TypeScript Development Rules
+
+## TypeScript Configuration
+- Use strict TypeScript configuration
+- Prefer interfaces over types for object definitions
+- Use generics for reusable components
+- Avoid 'any' type - use proper typing
+- Use utility types (Partial, Pick, Omit) when appropriate
+
+## React Best Practices
+- Use functional components with hooks
+- Prefer custom hooks for complex stateful logic
+- Use React.memo for expensive components
+- Implement proper key props for list items
+- Use proper dependency arrays in useEffect
+
+## Component Structure
+- One component per file
+- Use PascalCase for component names
+- Group related components in folders
+- Keep components small and focused (< 200 lines)
+- Use composition over inheritance
+
+## State Management
+- Use useState for local component state
+- Use useContext for prop drilling issues
+- Consider useReducer for complex state logic
+- Use React Query/SWR for server state
+- Avoid unnecessary re-renders
+
+## Styling
+- Use CSS Modules or styled-components
+- Follow BEM naming convention for CSS classes
+- Use CSS custom properties for theming
+- Implement responsive design mobile-first
+- Avoid inline styles
+
+## Performance
+- Lazy load routes and heavy components
+- Optimize bundle size with dynamic imports
+- Use React DevTools Profiler
+- Implement proper error boundaries
+- Use proper loading and error states
+
+## Testing
+- Write tests for all components
+- Use React Testing Library
+- Test user interactions, not implementation details
+- Mock external dependencies
+- Use MSW for API mocking
