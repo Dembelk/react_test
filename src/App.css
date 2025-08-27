@@ -96,6 +96,26 @@
   font-size: 0.9rem;
 }
 
+/* Error and Loading States */
+.error-message {
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: #ff6b6b;
+}
+
+.loading-indicator {
+  background: rgba(78, 205, 196, 0.2);
+  border: 1px solid rgba(78, 205, 196, 0.5);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  color: #4ecdc4;
+}
+
 .features {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
